@@ -1,44 +1,44 @@
 // Creates a set of courses that do not have "advanced" in the class name that are weighted as 4.50
 let levelIIExceptions = new Set([
-  "Editorial Leadership I, II, and III",
-  "Anatomy & Physiology ",
-  "Mentorship",
-  "Health Science Clinical",
-  "Practicum in Health Science - Pharmacy or Phlebotomy",
-  "Robotics II",
-  "Robotics III",
-  "Swift Coding",
-  "Business Incubator",
-  "Business ACCeleratoredu",
-  "Anatomy and Physiology",
-  "Engineering"
+  "editorial leadership i, ii, and iii",
+  "anatomy & physiology ",
+  "mentorship",
+  "health science clinical",
+  "practicum in health science - pharmacy or phlebotomy",
+  "robotics ii",
+  "robotics iii",
+  "swift coding",
+  "business incubator",
+  "business acceleratoredu",
+  "anatomy and physiology",
+  "engineering"
 ]);
 
 // Creates a set that includes courses that do not have "AP" in the class name but are weighted as 5.0
 const levelIIIExceptions = new Set([
-  "Multivariable Calculus", 
-  "Linear Algebra",
-  "Statistics 2: Beyond Statistics",
-  "Computer Science II",
-  "Computer Science III",
-  "Computer Science Ind Study I",
-  "Organic Chemistry",
-  "Art Historical Methods",
-  "Art Historical Methods II",
-  "Chinese V Advanced",
-  "Chinese VI Advanced",
-  "French V Advanced",
-  "French VI Advanced",
-  "German V Advanced",
-  "German VI Advanced",
-  "Latin V Advanced",
-  "Latin VI Advanced",
-  "Heritage, and Immersion Students",
-  "Spanish VI"
+  "multivariable calculus", 
+  "linear algebra",
+  "statistics 2: beyond statistics",
+  "computer science ii",
+  "computer science iii",
+  "computer science ind study i",
+  "organic chemistry",
+  "art historical methods",
+  "art historical methods ii",
+  "chinese v advanced",
+  "chinese vi advanced",
+  "french v advanced",
+  "french vi advanced",
+  "german v advanced",
+  "german vi advanced",
+  "latin v advanced",
+  "latin vi advanced",
+  "heritage, and immersion students",
+  "spanish vi"
 ]);
 
 const noCountException = new Set([
-  "AP COMPSCI B LOTE"
+  "ap compsci b lote"
 ]);
 
 const semesterExamWeight = 0.2; // 20%
@@ -108,7 +108,7 @@ function findGrades (semester, isFourPointScale) {
       else calculatedGPADifference = (100 - gradeNum);
     } else if (gradeNum == "") calculatedGPADifference = 0;
     
-    if (!noCountException.has(classes[i])) {
+    if (!noCountException.has(classes[i].toLowerCase())) {
       gradesGPA.push(calculatedGPADifference);
       rawGPA += calculatedGPADifference;
     }
@@ -163,12 +163,14 @@ function calculateUnweighted() {
 function findWeight(className) {
   let classNameLower = className.toLowerCase();
 
-  if (levelIIExceptions.has(className)) return 105;
-  if (levelIIIExceptions.has(className)) return 110;
-  if (noCountException.has(className)) return 0;
+  if (levelIIExceptions.has(className.toLowerCase())) return 105;
+  if (levelIIIExceptions.has(className.toLowerCase())) return 110;
+  if (noCountException.has(className.toLowerCase())) return 0;
   
   const isHonors = classNameLower.includes("honors");
   const isAP = classNameLower.includes("ap");
+
+  console.log(className + ": ", isHonors + ", " + isAP);
 
   if (isAP) return 110;
   else if (isHonors) return 105;
@@ -364,5 +366,77 @@ if (window.location.href.split(".")[1].startsWith(targetURL.split(".")[1]) && (w
 
   document.getElementById("download-btn").addEventListener("click", () => {
       downloadCSV(csvData, `${studentName}_${(gradeYear-1) % 100}-${gradeYear % 100}_GPA`);
+  });
+  document.addEventListener("DOMContentLoaded", () => {
+  const toggle = document.getElementById("predictionToggle");
+
+  // Load toggle state
+  chrome.storage.sync.get(["predictionEnabled"], (data) => {
+    toggle.checked = data.predictionEnabled || false;
+  });
+
+  toggle.addEventListener("change", () => {
+    const enabled = toggle.checked;
+    chrome.storage.sync.set({ predictionEnabled: enabled });
+
+    // Inform content script immediately
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      chrome.tabs.sendMessage(tabs[0].id, {
+        type: "TOGGLE_PREDICTION",
+        enabled: enabled,
+      });
+    });
+    console.log("changed");
+  });
+});
+}
+
+let predictionMode = false;
+
+// Listen for toggle from popup
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === "TOGGLE_PREDICTION") {
+    predictionMode = request.enabled;
+    updatePredictionButtons();
+  }
+});
+console.log(predictionMode);
+// You could also auto-check on page load
+chrome.storage.sync.get(["predictionEnabled"], (data) => {
+  predictionMode = data.predictionEnabled || false;
+  updatePredictionButtons();
+});
+
+function updatePredictionButtons() {
+  // First remove any existing buttons
+  document.querySelectorAll(".prediction-plus-btn").forEach(btn => btn.remove());
+
+  if (!predictionMode) return;
+
+  // Find all category rows (e.g., “Daily, 33.33%”)
+  const categoryRows = Array.from(document.querySelectorAll("td[colspan='2']"))
+    .filter(el => el.textContent.match(/[A-Z]+, \d+(\.\d+)?%/));
+
+  categoryRows.forEach(row => {
+    const label = row.textContent.trim();
+    if (label.includes(",") && label.includes("%")) {
+      const btn = document.createElement("button");
+      btn.textContent = "+";
+      btn.className = "prediction-plus-btn";
+      btn.style.marginLeft = "6px";
+      btn.style.cursor = "pointer";
+      btn.style.padding = "2px 5px";
+      btn.style.fontSize = "12px";
+      btn.onclick = () => {
+        const fakeGrade = prompt(`Enter sample grade for ${label}:`, "95");
+        if (fakeGrade) {
+          // You would then simulate adding it to the GPA calc logic
+          alert(`Simulating addition of ${fakeGrade}% to ${label}`);
+        }
+      };
+
+      // This assumes you can append to the row label's parent
+      row.appendChild(btn);
+    }
   });
 }
